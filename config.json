@@ -1,0 +1,20 @@
+{
+  "last_data_folder": "C:\\app_dev\\Analytics_Graph_Share\\Demo_data",
+  "plot_style": {
+    "show_markers": false,
+    "line_shape": "spline",
+    "marker_symbol": "circle",
+    "marker_size": 6
+  },
+  "aliases": {
+    "PM1.GasManifold.GasChannel1.Flow": "Gas FLow",
+    "PM1.PowerSupplyDC1.Current": "Current",
+    "PM1.PowerSupplyDC1.Power": "Power",
+    "PM1.PowerSupplyDC1.Voltage": "Voltage",
+    "PM1.PowerSupplyDC2.Current": "Current",
+    "PM1.PowerSupplyDC2.Power": "Power",
+    "PM1.PowerSupplyDC2.Voltage": "Voltage"
+  },
+  "auto_export_folder": "C:/app_dev/Analytics_Graph_Share/Demo_data",
+  "auto_export_enabled": true
+}
