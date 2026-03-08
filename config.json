@@ -16,5 +16,6 @@
     "PM1.PowerSupplyDC2.Voltage": "Voltage"
   },
   "auto_export_folder": "C:/app_dev/Analytics_Graph_Share/Demo_data",
-  "auto_export_enabled": true
+  "auto_export_enabled": true,
+  "plot_backend": "d3"
 }

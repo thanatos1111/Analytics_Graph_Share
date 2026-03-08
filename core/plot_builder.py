@@ -211,7 +211,7 @@ def build_figure(
         paper_bgcolor="white",
         plot_bgcolor="white",
         hoverlabel=dict(
-            bgcolor="#ffffcc",
+            bgcolor="rgba(255,255,204,0.95)",
             font=dict(size=12),
             namelength=0,
         ),

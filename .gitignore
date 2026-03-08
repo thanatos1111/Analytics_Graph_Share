@@ -25,5 +25,8 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# Demo/sample data
+Demo_data/
+
 # Local config (optional: remove if you want to track config.json)
 # config.json

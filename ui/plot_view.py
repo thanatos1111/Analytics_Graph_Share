@@ -1,5 +1,5 @@
 """
-Plot view: displays Plotly figure as HTML in a QWebEngineView.
+Plot view: displays chart as HTML in a QWebEngineView (backend: Plotly, uPlot, D3, Observable Plot, ECharts).
 """
 from __future__ import annotations
 
@@ -11,15 +11,11 @@ from PyQt6.QtCore import QTimer, QUrl
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
-import plotly.io as pio
-
-from core.plot_builder import build_figure
+from core.plot_backends import get_backend, get_default_backend_id
+from core.plot_backends.html_utils import inline_external_resources
 
 # Temp dir for plot HTML files (loading from file fixes blank display in QWebEngineView)
 _TEMP_PLOT_DIR = Path(tempfile.gettempdir()) / "analytics_graph_share"
-
-# Script for crosshair and y-axis zoom/pan (injected into generated HTML)
-_EMBED_SCRIPT_PATH = Path(__file__).resolve().parent / "plot_embed_script.js"
 
 
 def _ensure_temp_dir():
@@ -50,28 +46,21 @@ class PlotView(QWidget):
         if self._data_df is None or self._data_df.empty:
             self._browser.setHtml("<p>No data</p>")
             return
+        backend_id = getattr(self._main_window, "get_plot_backend", lambda: get_default_backend_id())()
+        backend = get_backend(backend_id)
+        if backend is None:
+            backend = get_backend(get_default_backend_id())
         aliases = getattr(self._main_window, "get_aliases", lambda: {})()
         plot_style = getattr(self._main_window, "get_plot_style", lambda: {})()
-        fig = build_figure(
+        html = backend.build_html(
             self._data_df,
             self._param_units,
             aliases=aliases,
-            show_markers=plot_style.get("show_markers", False),
-            line_shape=plot_style.get("line_shape", "linear"),
-            marker_symbol=plot_style.get("marker_symbol", "circle"),
-            marker_size=int(plot_style.get("marker_size", 6)),
+            plot_style=plot_style,
+            for_export=False,
         )
-        html = pio.to_html(
-            fig,
-            full_html=True,
-            include_plotlyjs=True,
-            config={"responsive": True, "scrollZoom": False},
-        )
-        # Inject crosshair and y-axis zoom/pan script
-        if _EMBED_SCRIPT_PATH.exists():
-            script = _EMBED_SCRIPT_PATH.read_text(encoding="utf-8")
-            html = html.replace("</body>", f"<script>\n{script}\n</script>\n</body>")
-        # Load from file: QWebEngineView often stays blank with setHtml(); loading a file URL works
+        # Inline external scripts/styles so chart renders from file:// in QWebEngineView
+        html = inline_external_resources(html)
         path = _plot_html_path(id(self))
         path.write_text(html, encoding="utf-8")
         self._browser.load(QUrl.fromLocalFile(str(path)))
@@ -83,24 +72,17 @@ class PlotView(QWidget):
     def export_html(self, path: str):
         if self._data_df is None or self._data_df.empty:
             return
+        backend_id = getattr(self._main_window, "get_plot_backend", lambda: get_default_backend_id())()
+        backend = get_backend(backend_id)
+        if backend is None:
+            backend = get_backend(get_default_backend_id())
         aliases = getattr(self._main_window, "get_aliases", lambda: {})()
         plot_style = getattr(self._main_window, "get_plot_style", lambda: {})()
-        fig = build_figure(
+        html = backend.build_html(
             self._data_df,
             self._param_units,
             aliases=aliases,
-            show_markers=plot_style.get("show_markers", False),
-            line_shape=plot_style.get("line_shape", "linear"),
-            marker_symbol=plot_style.get("marker_symbol", "circle"),
-            marker_size=int(plot_style.get("marker_size", 6)),
+            plot_style=plot_style,
+            for_export=True,
         )
-        html = pio.to_html(
-            fig,
-            full_html=True,
-            include_plotlyjs="cdn",
-            config={"responsive": True, "scrollZoom": False},
-        )
-        if _EMBED_SCRIPT_PATH.exists():
-            script = _EMBED_SCRIPT_PATH.read_text(encoding="utf-8")
-            html = html.replace("</body>", f"<script>\n{script}\n</script>\n</body>")
         Path(path).write_text(html, encoding="utf-8")

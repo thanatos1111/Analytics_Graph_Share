@@ -20,13 +20,14 @@ DEFAULT_PLOT_STYLE = {
 
 
 def load_config() -> dict:
-    """Load config from disk. Returns dict with keys: last_data_folder, plot_style, aliases, auto_export_folder, auto_export_enabled."""
+    """Load config from disk. Returns dict with keys: last_data_folder, plot_style, aliases, auto_export_folder, auto_export_enabled, plot_backend."""
     out = {
         "last_data_folder": "",
         "plot_style": dict(DEFAULT_PLOT_STYLE),
         "aliases": {},
         "auto_export_folder": "",
         "auto_export_enabled": False,
+        "plot_backend": "plotly",
     }
     if not CONFIG_PATH.exists():
         return out
@@ -45,6 +46,8 @@ def load_config() -> dict:
             out["auto_export_folder"] = data["auto_export_folder"]
         if isinstance(data.get("auto_export_enabled"), bool):
             out["auto_export_enabled"] = data["auto_export_enabled"]
+        if isinstance(data.get("plot_backend"), str) and data["plot_backend"]:
+            out["plot_backend"] = data["plot_backend"]
     except Exception:
         pass
     return out
@@ -56,6 +59,7 @@ def save_config(
     aliases: dict | None = None,
     auto_export_folder: str | None = None,
     auto_export_enabled: bool | None = None,
+    plot_backend: str | None = None,
 ) -> None:
     """Save config to disk. Omitted keys are left unchanged (read then write)."""
     current = load_config()
@@ -69,6 +73,8 @@ def save_config(
         current["auto_export_folder"] = auto_export_folder
     if auto_export_enabled is not None:
         current["auto_export_enabled"] = auto_export_enabled
+    if plot_backend is not None:
+        current["plot_backend"] = plot_backend
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(current, f, indent=2, ensure_ascii=False)

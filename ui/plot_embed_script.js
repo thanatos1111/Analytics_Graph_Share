@@ -4,6 +4,7 @@
     return els && els.length ? els[0] : null;
   }
   var BOTTOM_X_STRIP = 0.08;
+  var Y_AXIS_STRIP_PX = 50;
 
   function runAfterPlot() {
     var gd = findPlotDiv();
@@ -69,6 +70,12 @@
       var t = (pixelX - innerLeft) / innerWidth;
       return r[0] + t * (r[1] - r[0]);
     }
+    function isInYAxisRuler(pixelX) {
+      return pixelX < innerLeft || pixelX > innerRight;
+    }
+    function isInBottomXStrip(paperY) {
+      return paperY < BOTTOM_X_STRIP;
+    }
 
     gd.on('plotly_hover', function(ev) {
       if (!ev.points || !ev.points.length) return;
@@ -79,10 +86,10 @@
       for (var i = 0; i < yKeys.length; i += 2) {
         var d = layout[yKeys[i]].domain;
         if (d) {
-          shapes.push({ type: 'line', x0: pt.x, x1: pt.x, y0: d[0], y1: d[1], xref: 'x', yref: 'paper', line: { color: 'black', width: 1 } });
+          shapes.push({ type: 'line', x0: pt.x, x1: pt.x, y0: d[0], y1: d[1], xref: 'x', yref: 'paper', line: { color: 'rgba(0,0,0,0.5)', width: 1 } });
         }
       }
-      shapes.push({ type: 'line', x0: 0, x1: 1, y0: pt.y, y1: pt.y, xref: 'paper', yref: yref, line: { color: 'black', width: 1 } });
+      shapes.push({ type: 'line', x0: 0, x1: 1, y0: pt.y, y1: pt.y, xref: 'paper', yref: yref, line: { color: 'rgba(0,0,0,0.5)', width: 1 } });
       Plotly.relayout(gd, { shapes: shapes });
     });
     gd.on('plotly_unhover', function() {
@@ -94,6 +101,7 @@
 
     gd.addEventListener('wheel', function(ev) {
       var paperY = pixelToPaperY(ev.offsetY);
+      if (!isInYAxisRuler(ev.offsetX)) return;
       var yaxisKey = getSubplotAtPaperY(paperY);
       if (!yaxisKey) return;
       ev.preventDefault();
@@ -112,16 +120,16 @@
     }, { passive: false });
 
     gd.addEventListener('mousedown', function(ev) {
-      if (ev.button !== 0) return;
+      if (ev.button !== 2) return;
       var paperY = pixelToPaperY(ev.offsetY);
-      if (paperY < BOTTOM_X_STRIP) {
+      if (isInBottomXStrip(paperY)) {
         var dataX = pixelToDataX(ev.offsetX);
         if (dataX == null) return;
         var xkeys = getAllXaxisKeys();
         var xr = gd.layout[xkeys[0]].range;
         dragMode = 'xpan';
         dragStart = { dataX: dataX, range: [xr[0], xr[1]], xkeys: xkeys };
-      } else {
+      } else if (isInYAxisRuler(ev.offsetX)) {
         var yaxisKey = getSubplotAtPaperY(paperY);
         if (!yaxisKey) return;
         var dataY = paperToDataY(paperY, yaxisKey);
@@ -158,7 +166,7 @@
     });
 
     gd.addEventListener('mouseup', function(ev) {
-      if (ev.button === 0) { dragMode = null; dragStart = null; }
+      if (ev.button === 2) { dragMode = null; dragStart = null; }
     });
     gd.addEventListener('mouseleave', function() {
       dragMode = null;

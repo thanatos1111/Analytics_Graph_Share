@@ -6,12 +6,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import plotly.io as pio
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -33,9 +33,9 @@ from PyQt6.QtWidgets import (
 
 from core.config import load_config, save_config
 from core.data_loader import load_xlsx
-from core.plot_builder import build_figure
+from core.plot_backends import list_backends, get_backend, get_default_backend_id
 from ui.folder_watcher import FolderWatcher
-from ui.plot_view import PlotView, _EMBED_SCRIPT_PATH
+from ui.plot_view import PlotView
 from ui.settings_dialog import SettingsDialog
 
 
@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         }))
         self._auto_export_folder: str = cfg.get("auto_export_folder", "") or ""
         self._auto_export_enabled: bool = cfg.get("auto_export_enabled", False)
+        self._plot_backend_id: str = cfg.get("plot_backend") or get_default_backend_id()
         self._folder_watcher = FolderWatcher(self)
 
         central = QWidget()
@@ -90,6 +91,21 @@ class MainWindow(QMainWindow):
         self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.file_list.itemChanged.connect(self._on_file_item_changed)
         left_layout.addWidget(self.file_list)
+
+        # Plot backend selector
+        backend_row = QHBoxLayout()
+        backend_row.addWidget(QLabel("Plot backend:"))
+        self._backend_combo = QComboBox()
+        for b in list_backends():
+            self._backend_combo.addItem(b.name, b.id)
+        idx = self._backend_combo.findData(self._plot_backend_id)
+        if idx >= 0:
+            self._backend_combo.setCurrentIndex(idx)
+        else:
+            self._backend_combo.setCurrentIndex(0)
+        self._backend_combo.currentIndexChanged.connect(self._on_backend_changed)
+        backend_row.addWidget(self._backend_combo)
+        left_layout.addLayout(backend_row)
 
         # Auto-export (folder monitor)
         auto_group = QGroupBox("Auto-export (folder monitor)")
@@ -357,6 +373,18 @@ class MainWindow(QMainWindow):
     def get_plot_style(self) -> dict:
         return self._plot_style
 
+    def get_plot_backend(self) -> str:
+        """Current plot backend id (e.g. 'plotly', 'uplot')."""
+        return self._backend_combo.currentData() or get_default_backend_id()
+
+    def _on_backend_changed(self):
+        self._plot_backend_id = self.get_plot_backend()
+        save_config(plot_backend=self._plot_backend_id)
+        for i in range(self.tabs.count()):
+            view = self.tabs.widget(i)
+            if isinstance(view, PlotView):
+                view.refresh_plot()
+
     def _on_file_item_changed(self):
         """Called when checkbox of a file item is toggled."""
         self._sync_tabs()
@@ -436,24 +464,16 @@ class MainWindow(QMainWindow):
             return
         out_path = path.with_suffix(".html")
         try:
-            fig = build_figure(
+            backend = get_backend(self.get_plot_backend())
+            if backend is None:
+                backend = get_backend(get_default_backend_id())
+            html = backend.build_html(
                 data_df,
                 param_units,
                 aliases=self._aliases,
-                show_markers=self._plot_style.get("show_markers", False),
-                line_shape=self._plot_style.get("line_shape", "linear"),
-                marker_symbol=self._plot_style.get("marker_symbol", "circle"),
-                marker_size=int(self._plot_style.get("marker_size", 6)),
+                plot_style=self._plot_style,
+                for_export=True,
             )
-            html = pio.to_html(
-                fig,
-                full_html=True,
-                include_plotlyjs="cdn",
-                config={"responsive": True, "scrollZoom": False},
-            )
-            if _EMBED_SCRIPT_PATH.exists():
-                script = _EMBED_SCRIPT_PATH.read_text(encoding="utf-8")
-                html = html.replace("</body>", f"<script>\n{script}\n</script>\n</body>")
             out_path.write_text(html, encoding="utf-8")
             self._auto_export_status.setText(f"Exported: {out_path.name}")
         except Exception as e:
