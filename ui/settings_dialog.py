@@ -62,7 +62,7 @@ class SettingsDialog(QDialog):
         self._export_inline_d3_checkbox.setChecked(self._export_inline_d3)
         export_layout.addWidget(self._export_inline_d3_checkbox)
         export_hint = QLabel(
-            "Applies only to the D3 backend. When enabled, exported HTML can open without CDN access."
+            "When enabled, exported HTML can open without CDN access."
         )
         export_hint.setWordWrap(True)
         export_layout.addWidget(export_hint)

@@ -1,5 +1,5 @@
 """
-Plot view: displays chart as HTML in a QWebEngineView (backend: Plotly, uPlot, D3, Observable Plot, ECharts).
+Plot view: displays the D3.js chart as HTML in a QWebEngineView.
 """
 from __future__ import annotations
 
@@ -49,10 +49,10 @@ class PlotView(QWidget):
         if self._data_df is None or self._data_df.empty:
             self._browser.setHtml("<p>No data</p>")
             return
-        backend_id = getattr(self._main_window, "get_plot_backend", lambda: get_default_backend_id())()
-        backend = get_backend(backend_id)
+        backend = get_backend(get_default_backend_id())
         if backend is None:
-            backend = get_backend(get_default_backend_id())
+            self._browser.setHtml("<p>Plot backend unavailable</p>")
+            return
         plot_style = getattr(self._main_window, "get_plot_style", lambda: {})()
         html = backend.build_html(
             self._data_df,
@@ -74,10 +74,10 @@ class PlotView(QWidget):
     def export_html(self, path: str):
         if self._data_df is None or self._data_df.empty:
             return
-        backend_id = getattr(self._main_window, "get_plot_backend", lambda: get_default_backend_id())()
+        backend_id = get_default_backend_id()
         backend = get_backend(backend_id)
         if backend is None:
-            backend = get_backend(get_default_backend_id())
+            return
         plot_style = getattr(self._main_window, "get_plot_style", lambda: {})()
         html = backend.build_html(
             self._data_df,

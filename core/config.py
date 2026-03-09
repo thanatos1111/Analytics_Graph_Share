@@ -30,7 +30,7 @@ def load_config() -> dict:
         "plot_style": dict(DEFAULT_PLOT_STYLE),
         "auto_export_folder": "",
         "auto_export_enabled": False,
-        "plot_backend": "plotly",
+        "plot_backend": "d3",
         "export_inline_d3": False,
     }
     if not CONFIG_PATH.exists():
@@ -49,7 +49,7 @@ def load_config() -> dict:
         if isinstance(data.get("auto_export_enabled"), bool):
             out["auto_export_enabled"] = data["auto_export_enabled"]
         if isinstance(data.get("plot_backend"), str) and data["plot_backend"]:
-            out["plot_backend"] = data["plot_backend"]
+            out["plot_backend"] = "d3"
         if isinstance(data.get("export_inline_d3"), bool):
             out["export_inline_d3"] = data["export_inline_d3"]
     except Exception:
@@ -62,7 +62,6 @@ def save_config(
     plot_style: dict | None = None,
     auto_export_folder: str | None = None,
     auto_export_enabled: bool | None = None,
-    plot_backend: str | None = None,
     export_inline_d3: bool | None = None,
 ) -> None:
     """Save config to disk. Omitted keys are left unchanged (read then write)."""
@@ -75,8 +74,7 @@ def save_config(
         current["auto_export_folder"] = auto_export_folder
     if auto_export_enabled is not None:
         current["auto_export_enabled"] = auto_export_enabled
-    if plot_backend is not None:
-        current["plot_backend"] = plot_backend
+    current["plot_backend"] = "d3"
     if export_inline_d3 is not None:
         current["export_inline_d3"] = export_inline_d3
     try:

@@ -11,7 +11,6 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
-    QComboBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -33,7 +32,7 @@ from PyQt6.QtWidgets import (
 
 from core.config import load_config, save_config
 from core.data_loader import load_xlsx
-from core.plot_backends import list_backends, get_backend, get_default_backend_id
+from core.plot_backends import get_backend, get_default_backend_id
 from core.plot_backends.html_utils import inline_d3_resource
 from ui.folder_watcher import FolderWatcher
 from ui.plot_view import PlotView
@@ -72,7 +71,6 @@ class MainWindow(QMainWindow):
         }))
         self._auto_export_folder: str = cfg.get("auto_export_folder", "") or ""
         self._auto_export_enabled: bool = cfg.get("auto_export_enabled", False)
-        self._plot_backend_id: str = cfg.get("plot_backend") or get_default_backend_id()
         self._export_inline_d3: bool = cfg.get("export_inline_d3", False)
         self._folder_watcher = FolderWatcher(self)
 
@@ -95,19 +93,10 @@ class MainWindow(QMainWindow):
         self.file_list.itemChanged.connect(self._on_file_item_changed)
         left_layout.addWidget(self.file_list)
 
-        # Plot backend selector
         backend_row = QHBoxLayout()
         backend_row.addWidget(QLabel("Plot backend:"))
-        self._backend_combo = QComboBox()
-        for b in list_backends():
-            self._backend_combo.addItem(b.name, b.id)
-        idx = self._backend_combo.findData(self._plot_backend_id)
-        if idx >= 0:
-            self._backend_combo.setCurrentIndex(idx)
-        else:
-            self._backend_combo.setCurrentIndex(0)
-        self._backend_combo.currentIndexChanged.connect(self._on_backend_changed)
-        backend_row.addWidget(self._backend_combo)
+        backend_row.addWidget(QLabel("D3.js"))
+        backend_row.addStretch(1)
         left_layout.addLayout(backend_row)
 
         # Auto-export (folder monitor)
@@ -230,7 +219,6 @@ class MainWindow(QMainWindow):
             plot_style=self._plot_style,
             auto_export_folder=self._auto_export_folder,
             auto_export_enabled=self._auto_export_enabled,
-            plot_backend=self._plot_backend_id,
             export_inline_d3=self._export_inline_d3,
         )
         super().closeEvent(event)
@@ -295,8 +283,7 @@ class MainWindow(QMainWindow):
     def _sync_tabs(self):
         """Create/remove tabs so that one tab exists per selected file."""
         selected = self._get_selected_for_plot()
-        current_names = {self.tabs.tabText(i) for i in range(self.tabs.count())}
-        target_names = {p.name for p, _, _ in selected}
+        target_names = {path.name for path, _, _, _ in selected}
 
         # Remove tabs for deselected files
         to_remove = []
@@ -367,19 +354,11 @@ class MainWindow(QMainWindow):
         return self._plot_style
 
     def get_plot_backend(self) -> str:
-        """Current plot backend id (e.g. 'plotly', 'uplot')."""
-        return self._backend_combo.currentData() or get_default_backend_id()
+        """Current plot backend id."""
+        return get_default_backend_id()
 
     def get_export_inline_d3(self) -> bool:
         return self._export_inline_d3
-
-    def _on_backend_changed(self):
-        self._plot_backend_id = self.get_plot_backend()
-        save_config(plot_backend=self._plot_backend_id)
-        for i in range(self.tabs.count()):
-            view = self.tabs.widget(i)
-            if isinstance(view, PlotView):
-                view.refresh_plot()
 
     def _on_file_item_changed(self):
         """Called when checkbox of a file item is toggled."""

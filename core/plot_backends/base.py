@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-# Shared colors (same as plot_builder)
+# Shared chart colors
 TRACE_COLORS = [
     "#1f77b4", "#e63946", "#2a9d8f", "#e9c46a", "#9b59b6",
     "#3498db", "#e67e22", "#27ae60", "#c0392b", "#16a085",
@@ -144,7 +144,7 @@ class PlotBackend(ABC):
     @property
     @abstractmethod
     def id(self) -> str:
-        """Unique backend identifier (e.g. 'plotly', 'uplot')."""
+        """Unique backend identifier."""
         ...
 
     @property

@@ -1,22 +1,14 @@
 """
-Plot backends: switchable implementations (Plotly, uPlot, D3.js, Observable Plot, ECharts).
+Plot backends registry.
+
+The app now ships with the D3.js backend only.
 """
 from __future__ import annotations
 
 from core.plot_backends.base import PlotBackend, prepare_chart_data, chart_data_to_json
-from core.plot_backends.plotly_backend import PlotlyBackend
-from core.plot_backends.uplot_backend import UPlotBackend
 from core.plot_backends.d3_backend import D3Backend
-from core.plot_backends.observable_plot_backend import ObservablePlotBackend
-from core.plot_backends.echarts_backend import EChartsBackend
 
-_BACKENDS: list[PlotBackend] = [
-    PlotlyBackend(),
-    UPlotBackend(),
-    D3Backend(),
-    ObservablePlotBackend(),
-    EChartsBackend(),
-]
+_BACKENDS: list[PlotBackend] = [D3Backend()]
 
 
 def list_backends() -> list[PlotBackend]:
@@ -34,4 +26,4 @@ def get_backend(backend_id: str) -> PlotBackend | None:
 
 def get_default_backend_id() -> str:
     """Default backend id when none is configured."""
-    return "plotly"
+    return "d3"

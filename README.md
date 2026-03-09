@@ -42,8 +42,7 @@ python main.py
 - `main.py` — Entry point.
 - `core/data_loader.py` — Read xlsx (header, units, data).
 - `core/config.py` — Load/save app config (JSON): last data folder, plot style, aliases, export options.
-- `core/plot_builder.py` — Build plot figure (sections, alternating Y-axes, hover).
-- `core/plot_backends/` — Pluggable plot backends (Plotly, ECharts, D3, Observable Plot, uPlot).
+- `core/plot_backends/` — D3.js HTML plot backend and shared helpers.
 - `ui/main_window.py` — Main window (file list, tabs, menu).
 - `ui/plot_view.py` — Plot area (HTML in QWebEngineView) and export.
 - `ui/settings_dialog.py` — Aliases and plot-style dialog.
