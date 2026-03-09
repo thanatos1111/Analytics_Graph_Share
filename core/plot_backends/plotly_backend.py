@@ -3,6 +3,7 @@ Plotly backend: uses existing plot_builder + plotly.io.to_html + embed script.
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -12,7 +13,10 @@ from core.plot_builder import build_figure
 from core.plot_backends.base import PlotBackend
 
 # Embed script for crosshair and pan/zoom (only used by Plotly)
-_EMBED_SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "ui" / "plot_embed_script.js"
+if getattr(sys, "frozen", False):
+    _EMBED_SCRIPT_PATH = Path(sys._MEIPASS) / "ui" / "plot_embed_script.js"
+else:
+    _EMBED_SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "ui" / "plot_embed_script.js"
 
 
 class PlotlyBackend(PlotBackend):

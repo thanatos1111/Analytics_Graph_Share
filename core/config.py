@@ -5,10 +5,14 @@ Config file is JSON in the application directory.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-# Default location: next to main.py (project root)
-APP_DIR = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    APP_DIR = Path(sys.executable).resolve().parent
+else:
+    APP_DIR = Path(__file__).resolve().parent.parent
+
 CONFIG_PATH = APP_DIR / "config.json"
 
 DEFAULT_PLOT_STYLE = {

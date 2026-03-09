@@ -41,9 +41,11 @@ python main.py
 
 - `main.py` — Entry point.
 - `core/data_loader.py` — Read xlsx (header, units, data).
-- `core/plot_builder.py` — Build Plotly figure (sections, alternating Y-axes, hover).
+- `core/config.py` — Load/save app config (JSON): last data folder, plot style, aliases, export options.
+- `core/plot_builder.py` — Build plot figure (sections, alternating Y-axes, hover).
+- `core/plot_backends/` — Pluggable plot backends (Plotly, ECharts, D3, Observable Plot, uPlot).
 - `ui/main_window.py` — Main window (file list, tabs, menu).
-- `ui/plot_view.py` — Plot area (Plotly HTML in QWebEngineView) and export.
+- `ui/plot_view.py` — Plot area (HTML in QWebEngineView) and export.
 - `ui/settings_dialog.py` — Aliases and plot-style dialog.
 - `Demo_data/` — Sample xlsx files.
 - `config.json` — Saved settings (created on first run or when you change settings): last data folder, plot style, and parameter aliases. Loaded automatically when the app starts.
