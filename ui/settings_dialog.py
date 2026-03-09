@@ -1,9 +1,8 @@
 """
-Settings dialog: parameter aliases and plot style (markers, line shape, etc.).
+Settings dialog: plot style (markers, line shape, etc.) and export options.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -11,32 +10,25 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QScrollArea,
     QSpinBox,
     QVBoxLayout,
-    QWidget,
 )
 
 
 class SettingsDialog(QDialog):
     def __init__(
         self,
-        aliases: dict[str, str],
         plot_style: dict,
-        param_names: list[str],
+        export_inline_d3: bool,
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Settings — Aliases & plot style")
-        self.resize(500, 500)
+        self.setWindowTitle("Settings - plot style, export")
+        self.resize(500, 340)
 
-        self._aliases = dict(aliases)
         self._plot_style = dict(plot_style)
-        self._param_names = param_names
-        self._alias_edits: dict[str, QLineEdit] = {}
+        self._export_inline_d3 = export_inline_d3
 
         layout = QVBoxLayout(self)
 
@@ -62,28 +54,19 @@ class SettingsDialog(QDialog):
         style_layout.addRow("Marker size:", self._marker_size)
         layout.addWidget(style_group)
 
-        # Aliases group
-        alias_group = QGroupBox("Parameter aliases (short names for Y-axis and tooltip)")
-        alias_hint = QLabel("Clear the alias and click OK to remove it from saved settings.")
-        alias_hint.setWordWrap(True)
-        alias_group_layout_top = QVBoxLayout()
-        alias_group_layout_top.addWidget(alias_hint)
-        alias_inner = QWidget()
-        alias_layout = QFormLayout(alias_inner)
-        for name in self._param_names:
-            edit = QLineEdit()
-            edit.setPlaceholderText(name)
-            edit.setText(self._aliases.get(name, ""))
-            alias_layout.addRow(QLabel(name[:50] + ("..." if len(name) > 50 else "") + ":"), edit)
-            self._alias_edits[name] = edit
-        scroll = QScrollArea()
-        scroll.setWidget(alias_inner)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        alias_group_layout = QVBoxLayout(alias_group)
-        alias_group_layout.addLayout(alias_group_layout_top)
-        alias_group_layout.addWidget(scroll)
-        layout.addWidget(alias_group)
+        export_group = QGroupBox("HTML export")
+        export_layout = QVBoxLayout(export_group)
+        self._export_inline_d3_checkbox = QCheckBox(
+            "Embed D3 library in exported HTML for standalone viewing"
+        )
+        self._export_inline_d3_checkbox.setChecked(self._export_inline_d3)
+        export_layout.addWidget(self._export_inline_d3_checkbox)
+        export_hint = QLabel(
+            "Applies only to the D3 backend. When enabled, exported HTML can open without CDN access."
+        )
+        export_hint.setWordWrap(True)
+        export_layout.addWidget(export_hint)
+        layout.addWidget(export_group)
 
         # Buttons
         buttons = QDialogButtonBox(
@@ -93,14 +76,6 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def get_aliases(self) -> dict[str, str]:
-        result = {}
-        for name, edit in self._alias_edits.items():
-            val = edit.text().strip()
-            if val:
-                result[name] = val
-        return result
-
     def get_plot_style(self) -> dict:
         return {
             "show_markers": self._show_markers.isChecked(),
@@ -108,3 +83,6 @@ class SettingsDialog(QDialog):
             "marker_symbol": self._marker_symbol.currentText(),
             "marker_size": self._marker_size.value(),
         }
+
+    def get_export_inline_d3(self) -> bool:
+        return self._export_inline_d3_checkbox.isChecked()

@@ -55,3 +55,23 @@ def inline_external_resources(html: str) -> str:
     result = link_pattern.sub(replace_link, result)
 
     return result
+
+
+def inline_d3_resource(html: str) -> str:
+    """
+    Replace the exported D3 CDN script with inline content so the HTML can run
+    standalone from disk without internet access.
+    """
+    script_pattern = re.compile(
+        r'<script([^>]*)\ssrc=["\'](https://cdn\.jsdelivr\.net/npm/d3@[^"\']+)["\']([^>]*)></script>',
+        re.IGNORECASE,
+    )
+
+    def replace_script(m: re.Match) -> str:
+        pre, url, post = m.group(1), m.group(2), m.group(3)
+        content = _fetch_url(url)
+        if content is None:
+            return m.group(0)
+        return f"<script{pre}{post}>\n{content}\n</script>"
+
+    return script_pattern.sub(replace_script, html)

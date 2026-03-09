@@ -108,9 +108,21 @@ def _build_d3_html(data_json: str, for_export: bool) -> str:
     return d3.scaleLinear().domain([r.yMin, r.yMax]).range([bandBottomPx(bi), bandTopPx(bi)]);
   }}
 
+  function displayNameForParam(param) {{
+    return (param.alias && param.alias !== param.name) ? param.alias : param.name;
+  }}
+
   function paramLabel(band) {{
-    var pr = band.params[0];
-    var name = (pr.alias && pr.alias !== pr.name) ? pr.alias : pr.name;
+    if (!band.params || band.params.length === 0) return '';
+    var chosen = band.params[0];
+    for (var i = 0; i < band.params.length; i++) {{
+      var param = band.params[i];
+      if (param.alias && param.alias !== param.name) {{
+        chosen = param;
+        break;
+      }}
+    }}
+    var name = displayNameForParam(chosen);
     if (band.unit && band.unit !== '(no unit)') name += '(' + band.unit + ')';
     return name;
   }}
@@ -312,7 +324,9 @@ def _build_d3_html(data_json: str, for_export: bool) -> str:
     var val = param.values[idx];
     var valStr = (val != null && !isNaN(val)) ? Number(val).toLocaleString() : '—';
     var ts = timeDisplay[idx] || fmtFull(data.timeMs[idx]);
-    tooltip.innerHTML = param.name + '<br>Time: ' + ts + '<br>' + (param.alias || param.name) + ': ' + valStr;
+    var paramLabel = displayNameForParam(param);
+    if (param.unit && param.unit !== '(no unit)') paramLabel += '(' + param.unit + ')';
+    tooltip.innerHTML = param.name + '<br>Time: ' + ts + '<br>' + paramLabel + ': ' + valStr;
     tooltip.style.display = 'block';
     tooltip.style.left = (e.pageX + 14) + 'px';
     tooltip.style.top = (e.pageY + 14) + 'px';

@@ -24,23 +24,37 @@ TRACE_COLORS = [
 def _group_params_by_unit(
     param_units: dict[str, str],
     param_order: list[str] | None = None,
+    aliases: dict[str, str] | None = None,
 ) -> list[tuple[str, list[str]]]:
-    """
-    Group parameter names by unit. Returns list of (unit_label, [param_names])
+    """Group parameter names into bands.
+
+    * Parameter **with** a unit → gets its own band (one param per band).
+    * Parameter **without** a unit → grouped by alias name (same alias = same band).
+
+    Returns list of ``(unit_label, [param_names])``
     ordered by first occurrence (param_order = column order from file).
     """
+    aliases = aliases or {}
     order = param_order or list(param_units.keys())
-    seen_units: dict[str, list[str]] = {}
-    unit_order: list[str] = []
+
+    bands: list[list] = []
+    no_unit_idx: dict[str, int] = {}
+
     for name in order:
         if name not in param_units:
             continue
-        u = param_units[name] or "(no unit)"
-        if u not in seen_units:
-            seen_units[u] = []
-            unit_order.append(u)
-        seen_units[u].append(name)
-    return [(u, seen_units[u]) for u in unit_order]
+        unit = param_units[name] or ""
+        if unit:
+            bands.append([unit, [name]])
+        else:
+            alias = aliases.get(name, name)
+            if alias in no_unit_idx:
+                bands[no_unit_idx[alias]][1].append(name)
+            else:
+                no_unit_idx[alias] = len(bands)
+                bands.append(["(no unit)", [name]])
+
+    return [(b[0], b[1]) for b in bands]
 
 
 def build_figure(
@@ -59,7 +73,7 @@ def build_figure(
     """
     aliases = aliases or {}
     param_order = [c for c in data_df.columns if c in param_units]
-    groups = _group_params_by_unit(param_units, param_order)
+    groups = _group_params_by_unit(param_units, param_order, aliases=aliases)
     n_rows = len(groups)
 
     if n_rows == 0:

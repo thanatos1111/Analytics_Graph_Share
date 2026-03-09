@@ -34,19 +34,22 @@ from PyQt6.QtWidgets import (
 from core.config import load_config, save_config
 from core.data_loader import load_xlsx
 from core.plot_backends import list_backends, get_backend, get_default_backend_id
+from core.plot_backends.html_utils import inline_d3_resource
 from ui.folder_watcher import FolderWatcher
 from ui.plot_view import PlotView
 from ui.settings_dialog import SettingsDialog
 
 
 class FileItem(QListWidgetItem):
-    """List item that holds path, data, param_units, and checkbox state."""
+    """List item that holds path, data, param_units, param_aliases, and checkbox state."""
 
-    def __init__(self, path: Path, data_df: pd.DataFrame, param_units: dict[str, str], parent=None):
+    def __init__(self, path: Path, data_df: pd.DataFrame, param_units: dict[str, str],
+                 param_aliases: dict[str, str], parent=None):
         super().__init__(parent)
         self.path = path
         self.data_df = data_df
         self.param_units = param_units
+        self.param_aliases = param_aliases
         self.setData(Qt.ItemDataRole.UserRole, path)
         self.setText(path.name)
 
@@ -61,7 +64,6 @@ class MainWindow(QMainWindow):
         # Load saved config
         cfg = load_config()
         self._last_data_folder: str = cfg.get("last_data_folder", "") or ""
-        self._aliases: dict[str, str] = dict(cfg.get("aliases", {}))
         self._plot_style: dict = dict(cfg.get("plot_style", {
             "show_markers": False,
             "line_shape": "linear",
@@ -71,6 +73,7 @@ class MainWindow(QMainWindow):
         self._auto_export_folder: str = cfg.get("auto_export_folder", "") or ""
         self._auto_export_enabled: bool = cfg.get("auto_export_enabled", False)
         self._plot_backend_id: str = cfg.get("plot_backend") or get_default_backend_id()
+        self._export_inline_d3: bool = cfg.get("export_inline_d3", False)
         self._folder_watcher = FolderWatcher(self)
 
         central = QWidget()
@@ -161,9 +164,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(quit_act)
 
         settings_menu = menubar.addMenu("&Settings")
-        aliases_act = QAction("Parameter aliases and plot style...", self)
-        aliases_act.triggered.connect(self._on_settings)
-        settings_menu.addAction(aliases_act)
+        settings_act = QAction("Plot style and export...", self)
+        settings_act.triggered.connect(self._on_settings)
+        settings_menu.addAction(settings_act)
 
         self._folder_watcher.new_xlsx_added.connect(self._on_auto_export_new_file)
         self._setup_system_tray()
@@ -225,28 +228,29 @@ class MainWindow(QMainWindow):
         save_config(
             last_data_folder=self._last_data_folder,
             plot_style=self._plot_style,
-            aliases=self._aliases,
             auto_export_folder=self._auto_export_folder,
             auto_export_enabled=self._auto_export_enabled,
+            plot_backend=self._plot_backend_id,
+            export_inline_d3=self._export_inline_d3,
         )
         super().closeEvent(event)
 
-    def _get_loaded_files(self) -> list[tuple[Path, pd.DataFrame, dict[str, str]]]:
-        """Return list of (path, data_df, param_units) from current list."""
+    def _get_loaded_files(self) -> list[tuple[Path, pd.DataFrame, dict[str, str], dict[str, str]]]:
+        """Return list of (path, data_df, param_units, param_aliases) from current list."""
         result = []
         for i in range(self.file_list.count()):
             item = self.file_list.item(i)
             if isinstance(item, FileItem):
-                result.append((item.path, item.data_df, item.param_units))
+                result.append((item.path, item.data_df, item.param_units, item.param_aliases))
         return result
 
-    def _get_selected_for_plot(self) -> list[tuple[Path, pd.DataFrame, dict[str, str]]]:
+    def _get_selected_for_plot(self) -> list[tuple[Path, pd.DataFrame, dict[str, str], dict[str, str]]]:
         """Return only files that are selected (checked) for plotting."""
         result = []
         for i in range(self.file_list.count()):
             item = self.file_list.item(i)
             if isinstance(item, FileItem) and item.checkState() == Qt.CheckState.Checked:
-                result.append((item.path, item.data_df, item.param_units))
+                result.append((item.path, item.data_df, item.param_units, item.param_aliases))
         return result
 
     def _on_load_files(self):
@@ -269,7 +273,7 @@ class MainWindow(QMainWindow):
             for path_str in paths:
                 path = Path(path_str)
                 try:
-                    data_df, param_units = load_xlsx(path)
+                    data_df, param_units, param_aliases = load_xlsx(path)
                 except Exception as e:
                     QMessageBox.warning(
                         self,
@@ -277,7 +281,7 @@ class MainWindow(QMainWindow):
                         f"Could not load {path.name}:\n{e}",
                     )
                     continue
-                item = FileItem(path, data_df, param_units)
+                item = FileItem(path, data_df, param_units, param_aliases)
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 item.setCheckState(Qt.CheckState.Checked)
                 self.file_list.addItem(item)
@@ -303,7 +307,7 @@ class MainWindow(QMainWindow):
             self.tabs.removeTab(i)
 
         # Add or refresh tabs for selected files
-        for path, data_df, param_units in selected:
+        for path, data_df, param_units, param_aliases in selected:
             name = path.name
             idx = next((i for i in range(self.tabs.count()) if self.tabs.tabText(i) == name), None)
             is_new_tab = idx is None
@@ -314,7 +318,7 @@ class MainWindow(QMainWindow):
             else:
                 view = self.tabs.widget(idx)
             assert isinstance(view, PlotView)
-            view.set_data(data_df, param_units)
+            view.set_data(data_df, param_units, param_aliases)
             # Defer first paint for new tabs so the WebEngineView has valid size
             if is_new_tab:
                 view.refresh_plot_deferred()
@@ -326,26 +330,18 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_settings(self):
-        # Params from opened files + any from saved config (so user can edit/delete old aliases)
-        all_params: dict[str, str] = {}
-        for path, _, param_units in self._get_loaded_files():
-            for p, u in param_units.items():
-                if p not in all_params:
-                    all_params[p] = u
-        for p in self._aliases:
-            if p not in all_params:
-                all_params[p] = ""  # saved alias but no file loaded for this param
-        param_names = sorted(all_params.keys())
         dlg = SettingsDialog(
-            self._aliases.copy(),
             self._plot_style.copy(),
-            param_names,
+            self._export_inline_d3,
             self,
         )
         if dlg.exec():
-            self._aliases = dlg.get_aliases()
             self._plot_style = dlg.get_plot_style()
-            save_config(plot_style=self._plot_style, aliases=self._aliases)
+            self._export_inline_d3 = dlg.get_export_inline_d3()
+            save_config(
+                plot_style=self._plot_style,
+                export_inline_d3=self._export_inline_d3,
+            )
             for i in range(self.tabs.count()):
                 view = self.tabs.widget(i)
                 if isinstance(view, PlotView):
@@ -367,15 +363,15 @@ class MainWindow(QMainWindow):
         if isinstance(view, PlotView):
             view.export_html(path)
 
-    def get_aliases(self) -> dict[str, str]:
-        return self._aliases
-
     def get_plot_style(self) -> dict:
         return self._plot_style
 
     def get_plot_backend(self) -> str:
         """Current plot backend id (e.g. 'plotly', 'uplot')."""
         return self._backend_combo.currentData() or get_default_backend_id()
+
+    def get_export_inline_d3(self) -> bool:
+        return self._export_inline_d3
 
     def _on_backend_changed(self):
         self._plot_backend_id = self.get_plot_backend()
@@ -453,7 +449,7 @@ class MainWindow(QMainWindow):
         if not path.exists():
             return
         try:
-            data_df, param_units = load_xlsx(path)
+            data_df, param_units, param_aliases = load_xlsx(path)
         except Exception as e:
             self._auto_export_status.setText(f"Auto-export failed: {path.name}")
             QMessageBox.warning(
@@ -470,10 +466,12 @@ class MainWindow(QMainWindow):
             html = backend.build_html(
                 data_df,
                 param_units,
-                aliases=self._aliases,
+                aliases=param_aliases,
                 plot_style=self._plot_style,
                 for_export=True,
             )
+            if self._export_inline_d3 and self.get_plot_backend() == "d3":
+                html = inline_d3_resource(html)
             out_path.write_text(html, encoding="utf-8")
             self._auto_export_status.setText(f"Exported: {out_path.name}")
         except Exception as e:

@@ -12,7 +12,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from core.plot_backends import get_backend, get_default_backend_id
-from core.plot_backends.html_utils import inline_external_resources
+from core.plot_backends.html_utils import inline_d3_resource, inline_external_resources
 
 # Temp dir for plot HTML files (loading from file fixes blank display in QWebEngineView)
 _TEMP_PLOT_DIR = Path(tempfile.gettempdir()) / "analytics_graph_share"
@@ -33,14 +33,17 @@ class PlotView(QWidget):
         self._main_window = main_window
         self._data_df: pd.DataFrame | None = None
         self._param_units: dict[str, str] = {}
+        self._param_aliases: dict[str, str] = {}
         self._browser = QWebEngineView(self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._browser)
 
-    def set_data(self, data_df: pd.DataFrame, param_units: dict[str, str]):
+    def set_data(self, data_df: pd.DataFrame, param_units: dict[str, str],
+                 param_aliases: dict[str, str] | None = None):
         self._data_df = data_df
         self._param_units = param_units
+        self._param_aliases = param_aliases or {}
 
     def refresh_plot(self):
         if self._data_df is None or self._data_df.empty:
@@ -50,12 +53,11 @@ class PlotView(QWidget):
         backend = get_backend(backend_id)
         if backend is None:
             backend = get_backend(get_default_backend_id())
-        aliases = getattr(self._main_window, "get_aliases", lambda: {})()
         plot_style = getattr(self._main_window, "get_plot_style", lambda: {})()
         html = backend.build_html(
             self._data_df,
             self._param_units,
-            aliases=aliases,
+            aliases=self._param_aliases,
             plot_style=plot_style,
             for_export=False,
         )
@@ -76,13 +78,15 @@ class PlotView(QWidget):
         backend = get_backend(backend_id)
         if backend is None:
             backend = get_backend(get_default_backend_id())
-        aliases = getattr(self._main_window, "get_aliases", lambda: {})()
         plot_style = getattr(self._main_window, "get_plot_style", lambda: {})()
         html = backend.build_html(
             self._data_df,
             self._param_units,
-            aliases=aliases,
+            aliases=self._param_aliases,
             plot_style=plot_style,
             for_export=True,
         )
+        export_inline_d3 = getattr(self._main_window, "get_export_inline_d3", lambda: False)()
+        if export_inline_d3 and backend_id == "d3":
+            html = inline_d3_resource(html)
         Path(path).write_text(html, encoding="utf-8")
